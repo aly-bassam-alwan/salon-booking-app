@@ -1,3 +1,5 @@
+/// <reference types="node" />
+// Node-only test helpers (webcrypto, Buffer) are used to run real AES-GCM in Jest.
 import { webcrypto } from 'node:crypto';
 
 import {
