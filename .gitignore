@@ -1,0 +1,57 @@
+# dependencies
+node_modules/
+
+# environment / secrets (keep only the example)
+.env
+.env.*
+!.env.example
+
+# Expo
+.expo/
+expo-env.d.ts
+
+# build output
+dist/
+web-build/
+build/
+coverage/
+*.apk
+*.aab
+*.ipa
+
+# generated native folders (Continuous Native Generation)
+/ios
+/android
+.kotlin/
+
+# signing keys / certificates
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.orig.*
+
+# TypeScript
+*.tsbuildinfo
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Supabase local
+supabase/.branches
+supabase/.temp
