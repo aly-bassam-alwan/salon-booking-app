@@ -6,3 +6,4 @@ coverage
 package-lock.json
 SPEC.md
 supabase/config.jsonc
+src/types/database.ts

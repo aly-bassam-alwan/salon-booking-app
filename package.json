@@ -58,7 +58,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "check": "npm run lint && npm run typecheck && npm run format:check && npm test"
+    "check": "npm run lint && npm run typecheck && npm run format:check && npm test",
+    "db:types": "supabase gen types typescript --schema public > src/types/database.ts"
   },
   "private": true,
   "jest": {
