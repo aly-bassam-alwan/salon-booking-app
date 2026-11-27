@@ -42,6 +42,14 @@ export type TimeOff = {
   endsAt: Instant;
 };
 
+/**
+ * An anonymous busy period, as returned by the `get_busy_times` RPC: a booked
+ * appointment or time off, without saying which. Same shape and meaning as
+ * `TimeOff` (blocks the barber, or everyone when `barberId` is null), so busy
+ * intervals are passed in the `timeOff` argument. See `./busy-times`.
+ */
+export type BusyInterval = TimeOff;
+
 export type ExistingAppointment = {
   barberId: string;
   startsAt: Instant;
@@ -63,8 +71,9 @@ const MINUTE_MS = 60_000;
 /**
  * Available start times for one barber on one salon-local date.
  *
- * @param date  Salon-local calendar date, "YYYY-MM-DD".
- * @returns     Start instants (UTC `Date`s), ascending.
+ * @param date     Salon-local calendar date, "YYYY-MM-DD".
+ * @param timeOff  Blocked periods: time off, or `BusyInterval`s from `get_busy_times`.
+ * @returns        Start instants (UTC `Date`s), ascending.
  */
 export function getAvailableSlots(
   date: string,
