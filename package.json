@@ -1,6 +1,8 @@
 {
   "name": "salon-booking-app",
   "version": "1.0.0",
+  "license": "MIT",
+  "author": "Aly Bassam Alwan",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~58.0.30",

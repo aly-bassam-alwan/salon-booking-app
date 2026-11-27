@@ -27,3 +27,7 @@ npm start
 ## Status
 
 🚧 In development, following the phases in SPEC.md (tracked as GitHub Issues).
+
+## License
+
+[MIT](LICENSE) © Aly Bassam Alwan
