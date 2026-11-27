@@ -1,6 +1,8 @@
 {
   "name": "salon-booking-app",
   "version": "1.0.0",
+  "license": "MIT",
+  "author": "Aly Bassam Alwan",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~58.0.30",
@@ -38,6 +40,7 @@
     "jest": "~30.5.2",
     "jest-expo": "~58.0.16",
     "prettier": "^3.10.1",
+    "supabase": "^3.4.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -50,7 +53,12 @@
     "lint": "expo lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "check": "npm run lint && npm run typecheck && npm run format:check && npm test"
   },
   "private": true,
   "jest": {

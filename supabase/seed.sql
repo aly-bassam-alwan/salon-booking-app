@@ -1,0 +1,2 @@
+-- Local development seed data. Runs after migrations on `supabase db reset`.
+-- Filled in Phase 1 (services, barbers, working hours, sample customers).
