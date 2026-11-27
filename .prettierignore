@@ -5,3 +5,4 @@ coverage
 .expo
 package-lock.json
 SPEC.md
+supabase/config.jsonc
