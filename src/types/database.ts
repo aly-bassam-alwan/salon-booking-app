@@ -205,6 +205,28 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"cancel_appointment":
+{ Args: { "p_appointment_id": string }; Returns: {
+              "barber_id": string,
+"cancelled_at": string | null,
+"cancelled_by": string | null,
+"created_at": string,
+"currency": string,
+"customer_id": string,
+"customer_note": string | null,
+"ends_at": string,
+"id": string,
+"starts_at": string,
+"status": Database["public"]['Enums']["appointment_status"],
+"total_duration_minutes": number,
+"total_price_minor": number
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "appointments"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "current_barber_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
