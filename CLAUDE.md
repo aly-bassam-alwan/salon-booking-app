@@ -48,5 +48,6 @@ Before saying a task is done: `npm run lint && npm run typecheck && npm test` mu
 - Never commit `.env`; only `.env.example`. App uses only the Supabase **anon** key; the service-role key lives only in Edge Function secrets.
 - All timestamps stored in UTC; always display in the **salon timezone** (from `salon_settings`), never the device timezone.
 - Booking rules are enforced in Postgres (exclusion constraints + RPC functions); the app never inserts appointments directly.
-- Prices are integer cents; service durations are multiples of 30 min.
+- Prices are integer **minor units** of the salon currency (`price_minor`); format with `Intl.NumberFormat`. Service durations are multiples of 30 min.
+- **Never hard-code salon settings** (timezone, currency, lead time, cancellation cutoff, booking window). They live in the single-row `salon_settings` table, are enforced in DB functions, and the app reads them via `get_salon_settings()`.
 - One branch + PR per phase/issue; small commits; never commit directly to `main`.
