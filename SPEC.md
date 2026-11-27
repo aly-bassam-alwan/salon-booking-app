@@ -88,7 +88,7 @@ Two separate mechanisms:
 If two customers tap the same slot at once, one succeeds and the other gets a clean error (`23P01` exclusion violation, or a custom `SLOT_UNAVAILABLE`). The app shows "Sorry, that time was just taken" and reloads the slots.
 
 ### 3.5 Auto-assigning a barber ("Any available")
-*Implemented in Phase 2, together with `get_available_slots`.*
+*Implemented in Phase 2, together with `get_busy_times` + `getAvailableSlots`.*
 
 Among the barbers free for the whole interval, pick the one with the **fewest booked minutes that day**. Ties are broken by `barbers.sort_order`. This spreads work fairly and gives predictable results in tests. If the insert hits a conflict, try the next candidate before giving up.
 
@@ -114,7 +114,7 @@ Among the barbers free for the whole interval, pick the one with the **fewest bo
 ### 3.9 Configurable salon settings (nothing hard-coded)
 The app is meant to be reused for other salons in other countries (e.g. Qatar: `Asia/Qatar`, `QAR`). So **every salon-specific value lives in the single-row `salon_settings` table**. No timezone, currency, lead time, cutoff or window is hard-coded in the app or in SQL function bodies.
 
-- **The database reads settings at call time.** `get_available_slots`, `book_appointment` and `cancel_appointment` read `salon_settings` inside the same transaction. Lead time, booking window and cancellation cutoff are therefore **enforced in Postgres**, not only in the app, and a settings change takes effect on the next call with no redeploy.
+- **The database reads settings at call time.** `get_busy_times`, `book_appointment` and `cancel_appointment` read `salon_settings` inside the same transaction. Lead time, booking window and cancellation cutoff are therefore **enforced in Postgres**, not only in the app, and a settings change takes effect on the next call with no redeploy.
 - **The app reads settings from the server** via `get_salon_settings()` when it starts, cached with TanStack Query. It uses them for display only (timezone for formatting, currency for prices, cutoff to decide whether to show the Cancel button). The database stays the authority.
 - **Only admins can edit**, on the admin Settings screen (RLS: read for everyone signed in, update for `admin` only).
 - **Validation in the database:**
@@ -269,7 +269,7 @@ Everything the app does that involves rules goes through these. Plain table read
 |---|---|---|
 | `get_salon_settings()` | any signed-in user | Returns the public settings: name, phone, timezone, currency, lead time, cutoff, window |
 | `get_booking_window()` | any signed-in user | Returns the list of bookable dates (salon-local, from `booking_window_days`) and the salon timezone |
-| `get_available_slots(service_ids uuid[], barber_id uuid \| null, date date)` | customer | Returns available start times (`timestamptz[]`) using the rules in 3.3. With `barber_id = null`, returns the union over all barbers. Exposes **no** information about other customers |
+| `get_busy_times(p_from date default null, p_to date default null)` | signed-in user | Returns **only** `(barber_id, starts_at, ends_at)` for booked appointments and time off (`barber_id` null = salon-wide closure). No customer, note, price, status or reason. Limited and clipped to the booking window from `salon_settings`. The app computes slots from this with `getAvailableSlots` (`src/features/booking/`), and `book_appointment` re-checks every rule. *This replaces the server-side `get_available_slots` originally planned here.* |
 | `book_appointment(p_barber_id uuid, p_service_ids uuid[], p_start_time timestamptz, p_note text default null)` | signed-in user (books for themselves) | **The only way to create a booking.** Computes `ends_at` from the service durations, checks every rule in 3.3, locks the barber row and inserts the appointment and its service rows in one transaction. Returns the appointment. *Phase 1: `p_barber_id` is required. Phase 2 allows `null` = "any available barber" (3.5).* |
 | `cancel_appointment(appointment_id uuid)` | customer (own, before `cancellation_cutoff_minutes`) / admin (any) | Sets status to cancelled. Rejects customer calls past the cutoff with `PAST_CUTOFF` |
 | `get_barber_schedule(date date)` | barber (own) / admin (any barber via param) | Day view: appointments with customer name, phone and services, plus time-off blocks |
@@ -286,7 +286,7 @@ Errors come back as stable codes that the app maps to friendly messages:
 | `SLOT_UNAVAILABLE` | `book_appointment` | "Sorry, that time was just taken." |
 | `OUTSIDE_WORKING_HOURS` | `book_appointment` | "That time is outside opening hours." |
 | `TOO_SOON` | `book_appointment` (lead time) | "Please book at least {min_lead_minutes} minutes ahead." |
-| `OUT_OF_WINDOW` | `book_appointment`, `get_available_slots` | "You can book up to {booking_window_days} days ahead." |
+| `OUT_OF_WINDOW` | `book_appointment` | "You can book up to {booking_window_days} days ahead." |
 | `PAST_CUTOFF` | `cancel_appointment` | "Please call the salon to cancel." |
 | `INVALID_SERVICES` | `book_appointment` | "One of the selected services is no longer available." |
 | `INVALID_BARBER` | `book_appointment` | "That barber is not available for booking." |
@@ -308,8 +308,8 @@ RLS is **enabled on every table**. A summary of policies:
 | `profiles` | read/update **own** (not `role`) | read own + customers on own appointments | all |
 | `services` | read active | read | all |
 | `barbers` | read active (public fields) | read | all |
-| `working_hours` | — (only through RPC) | read own | all |
-| `time_off` | — (only through RPC) | read own | all |
+| `working_hours` | read for **active** barbers (also anon: opening hours are public) | same | all |
+| `time_off` | — (only via `get_busy_times`, anonymised) | read own + salon-wide | all |
 | `appointments` | read **own**. No direct insert/update | read own (as barber) | all |
 | `appointment_services` | read for own appointments | read for own appointments | all |
 
@@ -369,7 +369,7 @@ app/
 
 **Choose barber:** an "Any available barber" card at the top, then barber cards (photo, name).
 
-**Date & time:** a horizontal strip of `booking_window_days` days (today first, salon timezone; days with no slots greyed out). Below it, a grid of time buttons in 30-min steps from `get_available_slots`. Loading skeleton while fetching. Empty state: "No times left on this day. Try another date." Changing the date refetches.
+**Date & time:** a horizontal strip of `booking_window_days` days (today first, salon timezone; days with no slots greyed out). Below it, a grid of time buttons in 30-min steps from `getAvailableSlots` (fed by `get_busy_times`). Loading skeleton while fetching. Empty state: "No times left on this day. Try another date." Changing the date refetches.
 
 **Confirm:** services (each with duration/price), barber (or "Any available, assigned on booking"), date, start–end time, total duration, total price, optional note, **Book** button. The button is disabled while the request runs to avoid double taps. On `SLOT_UNAVAILABLE`, go back to the time screen with a toast and refreshed slots.
 
@@ -429,7 +429,7 @@ The database is the source of truth, so most of the important tests live there.
 **pgTAP (DB):**
 - Duration `CHECK` rejects 0, 45, -30. Accepts 30, 60, 90.
 - Exclusion constraint: an overlapping booked insert for the same barber fails. Back-to-back (`10:00–10:30` then `10:30–11:00`) succeeds. An overlap with a *cancelled* appointment succeeds.
-- `get_available_slots`:
+- Slot availability (`getAvailableSlots` Jest tests, `get_busy_times` pgTAP tests):
   - a 60-min booking isn't offered at 17:30 when the shift ends at 18:00
   - the slot right before a break is offered only if the full duration fits
   - nothing offered on a day with no working hours, on a time-off day, or outside the booking window
@@ -472,7 +472,7 @@ Each phase is a branch + PR with small commits, and ends with its tests passing.
 - **Done when:** `supabase db reset && supabase test db` passes.
 
 ### Phase 2: Availability & booking logic (the core)
-- `get_salon_settings`, `get_booking_window`, `get_available_slots`, `book_appointment`, `cancel_appointment`. All read lead time, cutoff and window from `salon_settings`.
+- `get_salon_settings`, `get_booking_window`, `get_busy_times`, `book_appointment`, `cancel_appointment`. All read lead time, cutoff and window from `salon_settings`.
 - Barber row locking, "any barber" assignment, error codes.
 - Full pgTAP coverage incl. DST and concurrency (two sessions booking the same slot).
 - Generate TypeScript types.
@@ -521,7 +521,7 @@ Push reminders (Expo Notifications + scheduled Edge Function), reschedule, per-b
 ### Decided (2026-11-27)
 | Topic | Decision | Where it lives |
 |---|---|---|
-| Minimum lead time | **60 minutes** before the appointment | `salon_settings.min_lead_minutes`, enforced in `get_available_slots` + `book_appointment` |
+| Minimum lead time | **60 minutes** before the appointment | `salon_settings.min_lead_minutes`, applied by `getAvailableSlots`, enforced in `book_appointment` |
 | Cancellation cutoff | Customers can cancel in the app up to **2 hours** before. After that: **"Please call the salon to cancel"** | `salon_settings.cancellation_cutoff_minutes`, enforced in `cancel_appointment` |
 | Salon timezone | **Asia/Beirut** | `salon_settings.timezone` |
 | Currency | **USD** | `salon_settings.currency` |

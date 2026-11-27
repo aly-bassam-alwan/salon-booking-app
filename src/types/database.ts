@@ -208,6 +208,11 @@ isOneToOne: false
 "current_barber_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"get_busy_times":
+{ Args: { "p_from"?: string,"p_to"?: string }; Returns: {
+              "barber_id": string,"ends_at": string,"starts_at": string
+            }[]
+                           },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            }
