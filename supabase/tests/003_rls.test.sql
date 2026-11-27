@@ -2,7 +2,7 @@
 -- We switch into the real `authenticated` / `anon` roles with JWT claims set,
 -- exactly like PostgREST does for app requests.
 begin;
-select plan(20);
+select plan(22);
 
 -- ---------------------------------------------------------------- fixtures
 insert into auth.users (id, email) values
@@ -25,7 +25,8 @@ insert into public.services (id, name, duration_minutes, price_minor, is_active)
 
 insert into public.working_hours (barber_id, weekday, start_time, end_time) values
   ('b3000000-0000-4000-8000-000000000001', 1, '09:00', '19:00'),
-  ('b3000000-0000-4000-8000-000000000002', 1, '09:00', '19:00');
+  ('b3000000-0000-4000-8000-000000000002', 1, '09:00', '19:00'),
+  ('b3000000-0000-4000-8000-000000000003', 1, '09:00', '19:00'); -- inactive barber
 
 -- Customer A with the linked barber; customer B with the other barber.
 insert into public.appointments
@@ -56,6 +57,9 @@ select throws_ok('select * from public.appointments', '42501', null,
   'anon: cannot read appointments');
 select throws_ok('select * from public.profiles', '42501', null,
   'anon: cannot read profiles');
+select is(
+  (select count(*)::int from public.working_hours where barber_id::text like 'b3000000%'), 2,
+  'anon: reads working hours of active barbers only');
 
 reset role;
 
@@ -76,8 +80,13 @@ select results_eq(
   $$values ('c0000000-0000-4000-8000-00000000000a'::uuid)$$,
   'customer: sees only their own profile');
 select is(
-  (select count(*)::int from public.working_hours), 0,
-  'customer: cannot read raw working hours');
+  (select count(*)::int from public.working_hours where barber_id::text like 'b3000000%'), 2,
+  'customer: reads working hours of active barbers only (inactive hidden)');
+select throws_ok(
+  $$insert into public.working_hours (barber_id, weekday, start_time, end_time)
+    values ('b3000000-0000-4000-8000-000000000002', 2, '09:00', '19:00')$$,
+  '42501', null,
+  'customer: cannot change working hours');
 
 select throws_ok(
   $$insert into public.appointments (customer_id, barber_id, starts_at, ends_at, total_duration_minutes, total_price_minor, currency)
@@ -123,8 +132,8 @@ select results_eq(
   $$values ('c0000000-0000-4000-8000-00000000000a'::uuid), ('d0000000-0000-4000-8000-000000000001'::uuid)$$,
   'barber: sees own profile and their customers, not other customers');
 select is(
-  (select count(*)::int from public.working_hours), 1,
-  'barber: reads only their own working hours');
+  (select count(*)::int from public.working_hours where barber_id::text like 'b3000000%'), 2,
+  'barber: reads working hours of active barbers like everyone else');
 
 reset role;
 
