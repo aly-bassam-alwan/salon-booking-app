@@ -88,16 +88,28 @@ Two separate mechanisms:
 If two customers tap the same slot at once, one succeeds and the other gets a clean error (`23P01` exclusion violation, or a custom `SLOT_UNAVAILABLE`). The app shows "Sorry, that time was just taken" and reloads the slots.
 
 ### 3.5 Auto-assigning a barber ("Any available")
-*Implemented in Phase 2, together with `get_busy_times` + `getAvailableSlots`.*
+*Implemented in Phase 2 (`book_appointment` with `p_barber_id = null`).*
 
-Among the barbers free for the whole interval, pick the one with the **fewest booked minutes that day**. Ties are broken by `barbers.sort_order`. This spreads work fairly and gives predictable results in tests. If the insert hits a conflict, try the next candidate before giving up.
+Among active barbers free for the **whole** interval (working hours, time off, existing bookings), pick by:
+1. **fewest booked minutes on that salon-local day.** Only `booked` appointments starting that day count: cancelled ones and other days don't. Minutes, not count, so 3 × 30 min (90) beats 2 × 60 min (120).
+2. then lowest `sort_order`,
+3. then lowest `id`.
+
+This spreads work fairly and is fully predictable, which keeps the tests reliable. If nobody is free, the result is `SLOT_UNAVAILABLE`.
+
+**Concurrency:** before choosing, the function locks every active barber row in `id` order (`FOR UPDATE`).
+- Two customers booking "any barber" at the same moment are therefore handled one after the other. The second sees the first one's booking and gets another free barber, or `SLOT_UNAVAILABLE`.
+- The fixed lock order can't deadlock with another "any" booking. A specific-barber booking locks only one barber row, so no lock cycle is possible.
+- This is verified with two real connections by `npm run db:test:race`, which also runs in CI.
 
 ### 3.6 Cancellation
 - Customers can cancel their own **upcoming** `booked` appointments until `cancellation_cutoff_minutes` before the start (default **120 min = 2 hours**).
 - **Enforced in the database:** `cancel_appointment()` rejects a customer cancellation with `PAST_CUTOFF` when `now() > starts_at - cancellation_cutoff_minutes`. The app hides the Cancel button by the same rule, but the database function is the real check.
 - After the cutoff, the appointment detail screen shows: **"Please call the salon to cancel."** (If `salon_settings.phone` is set, it's shown as a tap-to-call link.)
-- Admins can cancel any appointment at any time. The cutoff doesn't apply to them.
-- Cancelling sets `status = 'cancelled'` plus `cancelled_at` and `cancelled_by`. Rows are never deleted.
+- "Up to" is inclusive: cancelling exactly at the cutoff is allowed.
+- Barbers can cancel **their own** appointments at any time. Admins can cancel **any** appointment at any time. The cutoff doesn't apply to either.
+- Anyone else, or an unknown id, gets `NOT_FOUND`: the same error, so other people's bookings can't be probed. Only `booked` appointments can be cancelled; otherwise the result is `NOT_CANCELLABLE`.
+- Cancelling sets `status = 'cancelled'` plus `cancelled_at` and `cancelled_by`. Rows are never deleted. The double-booking constraint only covers booked rows, so the slot is free again immediately.
 
 ### 3.7 Blocked time vs. existing bookings
 - If a new time-off block overlaps existing **booked** appointments, `add_time_off()` **rejects** it and returns the conflicting appointments. The admin can cancel them first, then add the block.
@@ -270,8 +282,8 @@ Everything the app does that involves rules goes through these. Plain table read
 | `get_salon_settings()` | any signed-in user | Returns the public settings: name, phone, timezone, currency, lead time, cutoff, window |
 | `get_booking_window()` | any signed-in user | Returns the list of bookable dates (salon-local, from `booking_window_days`) and the salon timezone |
 | `get_busy_times(p_from date default null, p_to date default null)` | signed-in user | Returns **only** `(barber_id, starts_at, ends_at)` for booked appointments and time off (`barber_id` null = salon-wide closure). No customer, note, price, status or reason. Limited and clipped to the booking window from `salon_settings`. The app computes slots from this with `getAvailableSlots` (`src/features/booking/`), and `book_appointment` re-checks every rule. *This replaces the server-side `get_available_slots` originally planned here.* |
-| `book_appointment(p_barber_id uuid, p_service_ids uuid[], p_start_time timestamptz, p_note text default null)` | signed-in user (books for themselves) | **The only way to create a booking.** Computes `ends_at` from the service durations, checks every rule in 3.3, locks the barber row and inserts the appointment and its service rows in one transaction. Returns the appointment. *Phase 1: `p_barber_id` is required. Phase 2 allows `null` = "any available barber" (3.5).* |
-| `cancel_appointment(appointment_id uuid)` | customer (own, before `cancellation_cutoff_minutes`) / admin (any) | Sets status to cancelled. Rejects customer calls past the cutoff with `PAST_CUTOFF` |
+| `book_appointment(p_barber_id uuid, p_service_ids uuid[], p_start_time timestamptz, p_note text default null)` | signed-in user (books for themselves) | **The only way to create a booking.** Computes `ends_at` from the service durations, checks every rule in 3.3, locks the barber row and inserts the appointment and its service rows in one transaction. Returns the appointment. `p_barber_id = null` means "any available barber": the server picks one (3.5). |
+| `cancel_appointment(p_appointment_id uuid)` | customer (own, until `cancellation_cutoff_minutes` before start) / barber (own, any time) / admin (any, any time) | Sets status to cancelled (never deletes) and frees the slot. Errors: `PAST_CUTOFF`, `NOT_FOUND`, `NOT_CANCELLABLE` (3.6) |
 | `get_barber_schedule(date date)` | barber (own) / admin (any barber via param) | Day view: appointments with customer name, phone and services, plus time-off blocks |
 | `add_time_off(barber_id, starts_at, ends_at, reason)` | admin | Locks the barber and rejects the block if it overlaps bookings (3.7) |
 | `set_working_hours(barber_id, rows jsonb)` | admin | Replaces the barber's weekly hours in one transaction |
@@ -292,6 +304,8 @@ Errors come back as stable codes that the app maps to friendly messages:
 | `INVALID_BARBER` | `book_appointment` | "That barber is not available for booking." |
 | `INVALID_TIME` | `book_appointment` (missing or off the 30-min grid) | "Please pick one of the offered times." |
 | `ALREADY_BOOKED` | `book_appointment` (customer overlap) | "You already have an appointment at that time." |
+| `NOT_FOUND` | `cancel_appointment` (unknown, or not yours) | "That appointment could not be found." |
+| `NOT_CANCELLABLE` | `cancel_appointment` (not `booked`) | "This appointment can no longer be cancelled." |
 | `NOT_ALLOWED` | any | "You don't have permission to do that." |
 
 Messages with `{…}` are filled in from `salon_settings`, never from hard-coded numbers.

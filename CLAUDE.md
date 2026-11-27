@@ -45,6 +45,7 @@ npm run db:start       # start local Supabase (first run downloads images)
 npm run db:stop        # stop it
 npm run db:reset       # re-apply migrations + seed.sql
 npm run db:test        # pgTAP tests in supabase/tests
+npm run db:test:race   # two real connections booking "any barber" at once
 npm run db:types       # regenerate src/types/database.ts after schema changes
 ```
 
