@@ -16,16 +16,17 @@ npm start
 
 ## Scripts
 
-| Command             | What it does                            |
-| ------------------- | --------------------------------------- |
-| `npm start`         | Start the Expo dev server               |
-| `npm test`          | Run Jest tests                          |
-| `npm run lint`      | Lint with ESLint                        |
-| `npm run typecheck` | TypeScript check                        |
-| `npm run format`    | Format with Prettier                    |
-| `npm run check`     | Lint + typecheck + format check + tests |
-| `npm run db:start`  | Start local Supabase (needs Docker)     |
-| `npm run db:test`   | Run database (pgTAP) tests              |
+| Command                | What it does                                                 |
+| ---------------------- | ------------------------------------------------------------ |
+| `npm start`            | Start the Expo dev server                                    |
+| `npm test`             | Run Jest tests                                               |
+| `npm run lint`         | Lint with ESLint                                             |
+| `npm run typecheck`    | TypeScript check                                             |
+| `npm run format`       | Format with Prettier                                         |
+| `npm run check`        | Lint + typecheck + format check + tests                      |
+| `npm run db:start`     | Start local Supabase (needs Docker)                          |
+| `npm run db:test`      | Run database (pgTAP) tests                                   |
+| `npm run db:test:race` | Concurrency test: two customers booking "any barber" at once |
 
 ## Database
 
