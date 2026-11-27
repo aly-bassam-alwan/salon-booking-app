@@ -88,6 +88,8 @@ Two separate mechanisms:
 If two customers tap the same slot at once, one succeeds and the other gets a clean error (`23P01` exclusion violation, or a custom `SLOT_UNAVAILABLE`). The app shows "Sorry, that time was just taken" and reloads the slots.
 
 ### 3.5 Auto-assigning a barber ("Any available")
+*Implemented in Phase 2, together with `get_available_slots`.*
+
 Among the barbers free for the whole interval, pick the one with the **fewest booked minutes that day**. Ties are broken by `barbers.sort_order`. This spreads work fairly and gives predictable results in tests. If the insert hits a conflict, try the next candidate before giving up.
 
 ### 3.6 Cancellation
@@ -268,7 +270,7 @@ Everything the app does that involves rules goes through these. Plain table read
 | `get_salon_settings()` | any signed-in user | Returns the public settings: name, phone, timezone, currency, lead time, cutoff, window |
 | `get_booking_window()` | any signed-in user | Returns the list of bookable dates (salon-local, from `booking_window_days`) and the salon timezone |
 | `get_available_slots(service_ids uuid[], barber_id uuid \| null, date date)` | customer | Returns available start times (`timestamptz[]`) using the rules in 3.3. With `barber_id = null`, returns the union over all barbers. Exposes **no** information about other customers |
-| `book_appointment(service_ids uuid[], barber_id uuid \| null, starts_at timestamptz, note text)` | customer | Checks everything again, locks, picks a barber if needed, inserts the appointment and its service rows. Returns the appointment |
+| `book_appointment(p_barber_id uuid, p_service_ids uuid[], p_start_time timestamptz, p_note text default null)` | signed-in user (books for themselves) | **The only way to create a booking.** Computes `ends_at` from the service durations, checks every rule in 3.3, locks the barber row and inserts the appointment and its service rows in one transaction. Returns the appointment. *Phase 1: `p_barber_id` is required. Phase 2 allows `null` = "any available barber" (3.5).* |
 | `cancel_appointment(appointment_id uuid)` | customer (own, before `cancellation_cutoff_minutes`) / admin (any) | Sets status to cancelled. Rejects customer calls past the cutoff with `PAST_CUTOFF` |
 | `get_barber_schedule(date date)` | barber (own) / admin (any barber via param) | Day view: appointments with customer name, phone and services, plus time-off blocks |
 | `add_time_off(barber_id, starts_at, ends_at, reason)` | admin | Locks the barber and rejects the block if it overlaps bookings (3.7) |
@@ -287,6 +289,9 @@ Errors come back as stable codes that the app maps to friendly messages:
 | `OUT_OF_WINDOW` | `book_appointment`, `get_available_slots` | "You can book up to {booking_window_days} days ahead." |
 | `PAST_CUTOFF` | `cancel_appointment` | "Please call the salon to cancel." |
 | `INVALID_SERVICES` | `book_appointment` | "One of the selected services is no longer available." |
+| `INVALID_BARBER` | `book_appointment` | "That barber is not available for booking." |
+| `INVALID_TIME` | `book_appointment` (missing or off the 30-min grid) | "Please pick one of the offered times." |
+| `ALREADY_BOOKED` | `book_appointment` (customer overlap) | "You already have an appointment at that time." |
 | `NOT_ALLOWED` | any | "You don't have permission to do that." |
 
 Messages with `{…}` are filled in from `salon_settings`, never from hard-coded numbers.

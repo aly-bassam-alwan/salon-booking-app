@@ -45,6 +45,7 @@ npm run db:start       # start local Supabase (first run downloads images)
 npm run db:stop        # stop it
 npm run db:reset       # re-apply migrations + seed.sql
 npm run db:test        # pgTAP tests in supabase/tests
+npm run db:types       # regenerate src/types/database.ts after schema changes
 ```
 
 Before saying a task is done: `npm run check` must pass, plus `npm run db:test` when anything in `supabase/` changed. CI (`.github/workflows/ci.yml`) runs both on every PR.
