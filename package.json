@@ -70,7 +70,8 @@
     "db:test": "supabase test db",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm test",
     "db:types": "supabase gen types typescript --schema public > src/types/database.ts",
-    "db:test:race": "node scripts/db-race-test.mjs"
+    "db:test:race": "node scripts/db-race-test.mjs",
+    "dev:users": "node scripts/dev-users.mjs"
   },
   "private": true,
   "jest": {
