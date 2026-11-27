@@ -41,6 +41,7 @@
     "eslint-plugin-prettier": "^5.5.7",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.16",
+    "postgres": "^4.1.1",
     "prettier": "^3.10.1",
     "supabase": "^3.4.0",
     "typescript": "~6.0.3"
@@ -61,7 +62,8 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm test",
-    "db:types": "supabase gen types typescript --schema public > src/types/database.ts"
+    "db:types": "supabase gen types typescript --schema public > src/types/database.ts",
+    "db:test:race": "node scripts/db-race-test.mjs"
   },
   "private": true,
   "jest": {

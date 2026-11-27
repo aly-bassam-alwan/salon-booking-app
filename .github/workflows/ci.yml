@@ -42,3 +42,5 @@ jobs:
       - run: npx supabase db start
       - run: npx supabase db reset --local
       - run: npx supabase test db
+      # Two real connections booking "any barber" at once (pgTAP is single-session).
+      - run: npm run db:test:race
