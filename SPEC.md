@@ -338,16 +338,19 @@ Other rules:
 
 ## 7. Screens (Expo Router)
 
-Navigation is role-based. After login, the root layout reads `profiles.role` and redirects to the matching route group.
+Navigation is role-based. After login, the root layout reads `profiles.role` and `Stack.Protected` guards let each role into its own area only (`/customer`, `/barber`, `/admin`; Phase 3). Real path segments are used instead of `(group)` folders, because groups would make e.g. `/account` ambiguous across roles.
 
 ```
-app/
-  _layout.tsx                 # Providers (auth, query client), role-based redirect
+src/app/
+  _layout.tsx                 # AuthProvider, role guards (Stack.Protected)
+  index.tsx                   # Redirects to sign-in or the role's area
+  reset-password.tsx          # Deep link from the reset email (PKCE ?code=)
+  auth/callback.tsx           # Deep link from the sign-up confirmation email
   (auth)/
     sign-in.tsx
     sign-up.tsx
     forgot-password.tsx
-  (customer)/
+  customer/
     _layout.tsx               # Tabs: Book · My appointments · Profile
     book/
       _layout.tsx             # Stack; booking draft kept in context/store
@@ -360,12 +363,12 @@ app/
       index.tsx               # Upcoming / Past segmented list
       [id].tsx                # Detail + Cancel
     profile.tsx               # Name, phone, sign out
-  (barber)/
+  barber/
     _layout.tsx               # Tabs: Schedule · Profile
     schedule.tsx              # Day timeline, prev/next day, defaults to today
     appointment/[id].tsx      # Customer name/phone, services, note
     profile.tsx
-  (admin)/
+  admin/
     _layout.tsx               # Tabs: Today · Services · Barbers · Settings
     today.tsx                 # All barbers' schedules for a day
     services/index.tsx        # List, reorder, active toggle

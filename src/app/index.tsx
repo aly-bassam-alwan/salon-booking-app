@@ -1,28 +1,24 @@
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect } from 'expo-router';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Button, FormMessage, FormScreen } from '@/components/form';
+import { useAuth } from '@/features/auth/auth-provider';
+import { homeHrefForRole } from '@/features/auth/routing';
 
-export default function HomeScreen() {
+/** Entry point: send everyone to the right place. */
+export default function Index() {
+  const { session, role, retryRole, signOut } = useAuth();
+
+  if (!session) return <Redirect href="/sign-in" />;
+  if (role) return <Redirect href={homeHrefForRole(role)} />;
+
+  // Signed in, but the profile/role couldn't be loaded (e.g. offline).
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="title">Salon Booking</ThemedText>
-        <ThemedText>Book your next haircut in a few taps.</ThemedText>
-      </SafeAreaView>
-    </ThemedView>
+    <FormScreen title="Something went wrong">
+      <FormMessage tone="error">
+        We couldn&apos;t load your account. Check your connection.
+      </FormMessage>
+      <Button title="Try again" onPress={retryRole} />
+      <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
+    </FormScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.four,
-  },
-});
